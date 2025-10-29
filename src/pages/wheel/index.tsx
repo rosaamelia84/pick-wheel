@@ -6,7 +6,7 @@ import { type User } from "firebase/auth";
 import Wheel from "@/components/WheelDynamic";
 import Confetti from "react-confetti";
 import { toast } from "react-hot-toast";
-import AuthModal from "@/components/AuthModal";
+// import AuthModal from "@/components/AuthModal";
 
 interface Participant {
   email: string;
@@ -37,7 +37,7 @@ const WheelPage = ({ user }: { user: User | null }) => {
   const [windowSize, setWindowSize] = useState({ width: 0, height: 0 });
   const [canEdit, setCanEdit] = useState(false);
   const [localSpinning, setLocalSpinning] = useState(false);
-  const [authModalOpen, setAuthModalOpen] = useState(false);
+  // const [authModalOpen, setAuthModalOpen] = useState(false);
 
   const spinTriggeredRef = useRef(false); // Prevent re-triggering animation
   const lastWinnerTimestampRef = useRef<number>(0); // Track latest winner timestamp
@@ -103,7 +103,7 @@ const WheelPage = ({ user }: { user: User | null }) => {
           console.warn("🔒 [ACCESS] Private wheel requires authentication.");
           setError("This is a private wheel. Please log in to access it.");
           setLoading(false);
-          setAuthModalOpen(true);
+          // setAuthModalOpen(true);
           return;
         }
 
@@ -206,7 +206,7 @@ const WheelPage = ({ user }: { user: User | null }) => {
     // For private wheels, require authentication
     if (wheel && !wheel.isPublic && !auth.currentUser?.uid) {
       toast.error("Please log in to spin this private wheel.");
-      setAuthModalOpen(true);
+      // setAuthModalOpen(true);
       return;
     }
 
