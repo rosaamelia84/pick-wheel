@@ -19,10 +19,12 @@ function Builder({
   showConfetti,
   setShowConfetti,
   user,
+  onLocalSpin,
 }: {
   showConfetti: boolean;
   setShowConfetti: (show: boolean) => void;
   user: User | null;
+  onLocalSpin?: () => number;
 }) {
   const [nameType, setNameType] = useState<"boys" | "girls" | "unisex">("boys");
   const [currentItems, setCurrentItems] = useState<string>("");
@@ -196,9 +198,9 @@ function Builder({
     }
   };
 
-  const onSpinEnd = async (w: string) => {
+  const onSpin = async (w: string) => {
     setWinner(w);
-    // Increment user's spin count if they are logged in
+    // Increment user's spin count if they are logged in, otherwise increment local count
     if (auth.currentUser) {
       try {
         const userRef = doc(db, "users", auth.currentUser.uid);
@@ -209,6 +211,9 @@ function Builder({
         console.error("Error updating spin count:", error);
         // Don't show error to user as this is not critical to the wheel functionality
       }
+    } else if (onLocalSpin) {
+      // User is not logged in, increment local spin count
+      onLocalSpin();
     }
   };
 
@@ -404,7 +409,7 @@ function Builder({
         <Wheel
           items={items.filter(Boolean)}
           onSpin={(w) => {
-            onSpinEnd(w);
+            onSpin(w);
           }}
           showConfetti={showConfetti}
           setShowConfetti={setShowConfetti}

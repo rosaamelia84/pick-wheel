@@ -10,10 +10,12 @@ import SEOFAQSchema from "@/components/SEOFAQSchema";
 import {
   doc,
   onSnapshot,
+  updateDoc,
+  increment,
 } from "firebase/firestore";
 import { db } from "@/firebase";
 /******************** Utilities ********************/
-import { load } from "@/utils";
+import { load, save } from "@/utils";
 import { type User } from 'firebase/auth';
 
 // Global live spin counter (local demo)
@@ -27,6 +29,35 @@ const useTotalSpins = () => {
   return n;
 };
 
+// Utility function to increment local spin count
+const incrementLocalSpins = () => {
+  const current = load("qw_total_spins", 0);
+  const newCount = current + 1;
+  save("qw_total_spins", newCount);
+  // Dispatch event to update the counter display
+  window.dispatchEvent(new CustomEvent("qw:spins"));
+  return newCount;
+};
+
+// Utility function to sync local spins to Firebase when user logs in
+const syncLocalSpinsToFirebase = async (user: User) => {
+  const localSpins = load("qw_total_spins", 0);
+  if (localSpins > 0) {
+    try {
+      const userRef = doc(db, "users", user.uid);
+      await updateDoc(userRef, {
+        spinsCount: increment(localSpins),
+      });
+      // Clear local spins after successful sync
+      save("qw_total_spins", 0);
+      window.dispatchEvent(new CustomEvent("qw:spins"));
+      console.log(`Synced ${localSpins} local spins to Firebase`);
+    } catch (error) {
+      console.error("Error syncing local spins to Firebase:", error);
+    }
+  }
+};
+
 /******************** App ********************/
 export default function Home({ user }: { user: User | null}) {
   const total = useTotalSpins();
@@ -35,6 +66,7 @@ export default function Home({ user }: { user: User | null}) {
   const [showConfetti, setShowConfetti] = useState(false);
   const [windowSize, setWindowSize] = useState({ width: 0, height: 0 });
   const [userSpins, setUserSpins] = useState<number | null>(null);
+  const [hasUserChanged, setHasUserChanged] = useState(false);
 
   useEffect(() => {
     const handleResize = () =>
@@ -73,6 +105,21 @@ export default function Home({ user }: { user: User | null}) {
     }
   }, [user]);
 
+  // Sync local spins to Firebase when user logs in
+  useEffect(() => {
+    if (user && hasUserChanged) {
+      syncLocalSpinsToFirebase(user);
+      setHasUserChanged(false);
+    } else if (!user && hasUserChanged) {
+      setHasUserChanged(false);
+    }
+  }, [user, hasUserChanged]);
+
+  // Track user login/logout changes
+  useEffect(() => {
+    setHasUserChanged(true);
+  }, [user?.uid]);
+
 
   return (
     <div
@@ -88,8 +135,7 @@ export default function Home({ user }: { user: User | null}) {
           Or choose from many of our popular wheels
         </p>
         <div className="mt-4 inline-block px-6 py-3 bg-gradient-to-r from-pink-500 via-rose-500 to-purple-600 text-white font-bold text-2xl rounded-full shadow-lg animate-pulse relative">
-          {/* 🎉 {display.toLocaleString()} Spins Played! 🎉 */}
-          🎉 {userSpins?.toLocaleString()} Spins Played! 🎉
+          🎉 {user ? userSpins?.toLocaleString() : display.toLocaleString()} Spins Played! 🎉
           <div className="absolute -top-2 -right-2 bg-amber-400 w-4 h-4 rounded-full animate-ping"></div>
         </div>
         <p className="text-slate-500 text-sm mt-2">and counting...</p>
@@ -100,6 +146,7 @@ export default function Home({ user }: { user: User | null}) {
           showConfetti={showConfetti}
           setShowConfetti={setShowConfetti}
           user={user}
+          onLocalSpin={incrementLocalSpins}
         />
         <PopularWheels />
         <BlogTeasers />
