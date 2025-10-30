@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
 import { db } from "@/firebase";
 import { type User } from "firebase/auth";
+import { useNavigate } from "react-router-dom";
 
 interface UserData {
   uid: string;
@@ -17,6 +18,7 @@ interface AdminPageProps {
 }
 
 const AdminPage = ({ user }: AdminPageProps) => {
+  const navigate = useNavigate();
   const [users, setUsers] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -27,8 +29,11 @@ const AdminPage = ({ user }: AdminPageProps) => {
   useEffect(() => {
     if (!user || !isAdmin) {
       setLoading(false);
+      navigate("/");
       return;
     }
+
+    
 
     const usersQuery = query(
       collection(db, "users"),
