@@ -1,4 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from "react";
+import { doc, getDoc, setDoc, updateDoc, increment } from "firebase/firestore";
+import { db } from "../firebase";
 import AuthModal from "./AuthModal";
 
 interface WheelProps {
@@ -175,6 +177,9 @@ function Wheel({
       const selected = items[pick];
       onSpin(selected);
 
+      // Increment global spin counter
+      incrementGlobalSpins();
+
       if (winSound.current) {
         winSound.current.play().catch((error) => {
           console.error("Error playing win sound:", error);
@@ -197,6 +202,29 @@ function Wheel({
       }
     };
   }, []);
+
+  // Utility function to increment global website spin count
+  const incrementGlobalSpins = async () => {
+    try {
+      const globalStatsRef = doc(db, "globalStats", "websiteStats");
+      
+      // Check if document exists, create if it doesn't
+      const docSnap = await getDoc(globalStatsRef);
+      if (!docSnap.exists()) {
+        await setDoc(globalStatsRef, {
+          totalSpins: 1,
+          lastUpdated: new Date().toISOString(),
+        });
+      } else {
+        await updateDoc(globalStatsRef, {
+          totalSpins: increment(1),
+          lastUpdated: new Date().toISOString(),
+        });
+      }
+    } catch (error) {
+      console.error("Error incrementing global spins:", error);
+    }
+  };
 
   // Toggle mute/unmute
   const toggleMute = () => {

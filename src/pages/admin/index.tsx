@@ -1,5 +1,11 @@
 import { useEffect, useState } from "react";
-import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
+import {
+  collection,
+  onSnapshot,
+  orderBy,
+  query,
+  doc,
+} from "firebase/firestore";
 import { db } from "@/firebase";
 import { type User } from "firebase/auth";
 import { useNavigate } from "react-router-dom";
@@ -22,6 +28,7 @@ const AdminPage = ({ user }: AdminPageProps) => {
   const [users, setUsers] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [globalSpins, setGlobalSpins] = useState<number>(0);
 
   // Simple admin check - you can enhance this with proper role-based access
   const isAdmin = user?.email === "raarnadottir@gmail.com";
@@ -32,8 +39,6 @@ const AdminPage = ({ user }: AdminPageProps) => {
       navigate("/");
       return;
     }
-
-    
 
     const usersQuery = query(
       collection(db, "users"),
@@ -60,6 +65,28 @@ const AdminPage = ({ user }: AdminPageProps) => {
     return () => unsubscribe();
   }, [user, isAdmin]);
 
+  // Listen to global stats
+  useEffect(() => {
+    if (!user || !isAdmin) return;
+    const globalStatsRef = doc(db, "globalStats", "websiteStats");
+    const unsubscribeGlobal = onSnapshot(
+      globalStatsRef,
+      (doc) => {
+        if (doc.exists()) {
+          const data = doc.data();
+          setGlobalSpins(data.totalSpins || 0);
+        } else {
+          setGlobalSpins(0);
+        }
+      },
+      (err) => {
+        console.error("Error fetching global stats:", err);
+        setGlobalSpins(0);
+      }
+    );
+    return () => unsubscribeGlobal();
+  }, [user, isAdmin]);
+
   const formatDate = (dateString: string) => {
     try {
       return new Date(dateString).toLocaleDateString("en-US", {
@@ -75,7 +102,7 @@ const AdminPage = ({ user }: AdminPageProps) => {
   };
 
   const exportToCSV = () => {
-    const headers = ["Email", "Display Name", "Spins Count", "Created At", "Is Public"];
+    const headers = ["Email", "Display Name", "Created At", "Is Public"];
     const csvContent = [
       headers.join(","),
       ...users.map((user) =>
@@ -101,7 +128,9 @@ const AdminPage = ({ user }: AdminPageProps) => {
   if (!user) {
     return (
       <div className="max-w-4xl mx-auto p-6 text-center">
-        <p className="text-lg text-slate-600">Please log in to access the admin panel.</p>
+        <p className="text-lg text-slate-600">
+          Please log in to access the admin panel.
+        </p>
       </div>
     );
   }
@@ -124,7 +153,9 @@ const AdminPage = ({ user }: AdminPageProps) => {
       <div className="max-w-6xl mx-auto p-6">
         <div className="flex items-center justify-center py-12">
           <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
-          <span className="ml-3 text-lg text-slate-600">Loading user data...</span>
+          <span className="ml-3 text-lg text-slate-600">
+            Loading user data...
+          </span>
         </div>
       </div>
     );
@@ -144,24 +175,34 @@ const AdminPage = ({ user }: AdminPageProps) => {
     <div className="max-w-6xl mx-auto p-6">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-slate-900 mb-2">Admin Dashboard</h1>
+        <h1 className="text-3xl font-bold text-slate-900 mb-2">
+          Admin Dashboard
+        </h1>
         <p className="text-slate-600">Manage and view all registered users</p>
       </div>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <div className="bg-white rounded-lg shadow-sm border p-6">
-          <h3 className="text-sm font-medium text-slate-500 uppercase tracking-wide">Total Users</h3>
-          <p className="text-3xl font-bold text-slate-900 mt-2">{users.length}</p>
-        </div>
-        <div className="bg-white rounded-lg shadow-sm border p-6">
-          <h3 className="text-sm font-medium text-slate-500 uppercase tracking-wide">Total Spins</h3>
+          <h3 className="text-sm font-medium text-slate-500 uppercase tracking-wide">
+            Total Users
+          </h3>
           <p className="text-3xl font-bold text-slate-900 mt-2">
-            {users.reduce((sum, user) => sum + (user.spinsCount || 0), 0)}
+            {users.length}
           </p>
         </div>
         <div className="bg-white rounded-lg shadow-sm border p-6">
-          <h3 className="text-sm font-medium text-slate-500 uppercase tracking-wide">Public Profiles</h3>
+          <h3 className="text-sm font-medium text-slate-500 uppercase tracking-wide">
+            Total Spins
+          </h3>
+          <p className="text-3xl font-bold text-slate-900 mt-2">
+            {globalSpins.toLocaleString()}
+          </p>
+        </div>
+        <div className="bg-white rounded-lg shadow-sm border p-6">
+          <h3 className="text-sm font-medium text-slate-500 uppercase tracking-wide">
+            Public Profiles
+          </h3>
           <p className="text-3xl font-bold text-slate-900 mt-2">
             {users.filter((user) => user.isPublic).length}
           </p>
@@ -192,9 +233,6 @@ const AdminPage = ({ user }: AdminPageProps) => {
                   Display Name
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                  Spins Count
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
                   Created At
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
@@ -206,16 +244,13 @@ const AdminPage = ({ user }: AdminPageProps) => {
               {users.map((userData) => (
                 <tr key={userData.uid} className="hover:bg-slate-50">
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-slate-900">{userData.email}</div>
+                    <div className="text-sm font-medium text-slate-900">
+                      {userData.email}
+                    </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-slate-600">
                       {userData.displayName || "No display name"}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-slate-900 font-medium">
-                      {userData.spinsCount || 0}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
